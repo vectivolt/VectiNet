@@ -23,17 +23,18 @@ static const char NET_UI_HTML[] PROGMEM = R"HTML(<!doctype html>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="theme-color" content="#0a0c12"/>
-<title>__TITLE__</title>
+<title>JouleNet</title>
 <style>
 :root{
-  --bg:#0a0c12;--panel:rgba(255,255,255,.04);--panel-s:#141a2a;
-  --ink:#e8ecf5;--ink2:#a5acc1;--muted:#6b7390;--line:rgba(255,255,255,.08);
-  --brand:__BRAND__;--brand-2:#22d3ee;--ok:#3ddc97;--err:#ff6b81;--warn:#ffb347;
-  --r:16px;--shadow:0 12px 40px rgba(0,0,0,.3);
+  --bg:#0b0f1a;--panel:rgba(255,255,255,.035);--panel-s:#151a2b;
+  --ink:#e6e9f2;--ink2:#9aa3b9;--muted:#6b7390;--line:rgba(255,255,255,.07);
+  --brand:#0ea5e9;--brand-2:#6366f1;   /* sky + indigo — network feel */
+  --ok:#10b981;--err:#ef4444;--warn:#f59e0b;--info:#0ea5e9;
+  --r:16px;--shadow:0 12px 36px rgba(8,12,28,.45);
   --grad:linear-gradient(135deg,var(--brand),var(--brand-2));
 }
-:root[data-theme="light"]{--bg:#f4f6fc;--panel:rgba(255,255,255,.75);--panel-s:#fff;--ink:#0f1730;--ink2:#3a4366;--line:rgba(15,23,48,.08);--shadow:0 10px 28px rgba(20,32,80,.08)}
-@media(prefers-color-scheme:light){:root[data-theme="auto"]{--bg:#f4f6fc;--panel:rgba(255,255,255,.75);--panel-s:#fff;--ink:#0f1730;--ink2:#3a4366;--line:rgba(15,23,48,.08);--shadow:0 10px 28px rgba(20,32,80,.08)}}
+:root[data-theme="light"]{--bg:#f7f8fb;--panel:rgba(255,255,255,.78);--panel-s:#fff;--ink:#101427;--ink2:#3a4366;--line:rgba(16,20,39,.08);--shadow:0 10px 28px rgba(20,32,80,.08)}
+@media(prefers-color-scheme:light){:root[data-theme="auto"]{--bg:#f7f8fb;--panel:rgba(255,255,255,.78);--panel-s:#fff;--ink:#101427;--ink2:#3a4366;--line:rgba(16,20,39,.08);--shadow:0 10px 28px rgba(20,32,80,.08)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;min-height:100%}
 body{font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);
   background-image:radial-gradient(1000px 500px at 10% -10%,color-mix(in srgb,var(--brand) 18%,transparent),transparent 60%),radial-gradient(900px 450px at 110% 10%,color-mix(in srgb,var(--brand-2) 14%,transparent),transparent 55%);
@@ -91,7 +92,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;margin:18px 0 30px}
 <div class="wrap">
 <header>
   <div class="logo">📶</div>
-  <div><h1>__TITLE__</h1><div class="sub">JouleNet · pick a network &amp; apply settings</div></div>
+  <div><h1 id="appTitle">JouleNet</h1><div class="sub">pick a network · apply settings</div></div>
   <div class="spacer"></div>
   <button class="iconbtn" id="themeBtn">◐</button>
 </header>
@@ -147,7 +148,7 @@ let selectedSsid=null,scanBusy=false,statusTimer=null;
 function toast(m,k){const t=$("#toast");t.textContent=m;t.className="toast show "+(k||"");setTimeout(()=>t.className="toast",2400)}
 function bars(rssi){const n=Math.min(4,Math.max(0,Math.round((rssi+90)/10)));return "▂▄▆█".substr(0,n).padEnd(4,"·")}
 
-function applyTheme(){document.documentElement.setAttribute("data-theme",localStorage.getItem("joule-theme")||"auto")}
+function applyTheme(){document.documentElement.setAttribute("data-theme",localStorage.getItem("joule-theme")||"dark")}
 $("#themeBtn").onclick=()=>{const c=document.documentElement.getAttribute("data-theme")||"auto";const n=c==="auto"?"dark":(c==="dark"?"light":"auto");localStorage.setItem("joule-theme",n);applyTheme();toast("Theme: "+n)};
 applyTheme();
 
@@ -210,14 +211,25 @@ $("#saveParams").onclick=async()=>{
 
 const LABEL={state:"State",ssid:"SSID",ip:"IP",gateway:"Gateway",mask:"Netmask",dns:"DNS",bssid:"BSSID",channel:"Channel",rssi:"RSSI",hostname:"Hostname",mdns:"mDNS",mac:"MAC",heap:"Heap",uptime_s:"Uptime"};
 const STATE=["idle","connecting","connected","portal","failed"];
+function applyMeta(j){
+  if(j.title){document.title=j.title;const t=$("#appTitle");if(t)t.textContent=j.title}
+  if(j.brand){document.documentElement.style.setProperty("--brand",j.brand);
+              document.querySelector('meta[name="theme-color"]')?.setAttribute("content",j.brand)}
+}
 async function loadStatus(){
   try{const r=await fetch("/wifi/status"),j=await r.json();
-    if("state" in j)j.state=STATE[j.state]||j.state;
-    if("uptime_s" in j)j.uptime_s=j.uptime_s+"s";
-    if("heap" in j)j.heap=Math.round(j.heap/1024)+" KB";
-    $("#statusHolder").innerHTML=Object.entries(j).map(([k,v])=>`<div class="kv"><span class="k">${LABEL[k]||k}</span><span class="v">${v}</span></div>`).join("");
+    applyMeta(j);
+    // strip meta fields before rendering the table — they're consumed above
+    const view={...j};delete view.title;delete view.brand;
+    if("state" in view)view.state=STATE[view.state]||view.state;
+    if("uptime_s" in view)view.uptime_s=view.uptime_s+"s";
+    if("heap" in view)view.heap=Math.round(view.heap/1024)+" KB";
+    $("#statusHolder").innerHTML=Object.entries(view).map(([k,v])=>`<div class="kv"><span class="k">${LABEL[k]||k}</span><span class="v">${v}</span></div>`).join("");
   }catch(e){}
 }
+// Always pull meta once on first load so the brand/title is live even
+// before the Status tab is opened.
+loadStatus();
 $("#resetBtn").onclick=async()=>{if(!confirm("Erase ALL Wi-Fi credentials and settings, then reboot?"))return;await fetch("/wifi/reset",{method:"POST"});toast("erased — rebooting","ok")};
 $("#restartBtn").onclick=async()=>{await fetch("/wifi/restart",{method:"POST"});toast("restarting","ok")};
 

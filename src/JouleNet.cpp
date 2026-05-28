@@ -143,6 +143,11 @@ void JouleNetClass::_saveToNvs() {
 
 String JouleNetClass::_statusJson() const {
   JsonDocument d;
+  // title + brand let the browser-side JS apply setTitle() / setBrandColor()
+  // at runtime even though the HTML body itself ships pre-gzipped (no
+  // server-side template substitution path).
+  d["title"]    = _title;
+  d["brand"]    = _brandColor;
   d["state"]    = (int)_state;
   d["ssid"]     = _activeSsid;
   d["ip"]       = WiFi.localIP().toString();
