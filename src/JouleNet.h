@@ -15,8 +15,11 @@
 //   * Captive portal that pops up the setup page on every connected device
 //     (DNS hijack on the SoftAP).
 //   * Custom parameters (text / password / number / toggle / dropdown /
-//     color) merged into the setup form — perfect for one-shot device
-//     onboarding (MQTT host, room name, calibration constants, …).
+//     color / textarea / read-only display) merged into the setup form —
+//     perfect for one-shot device onboarding (MQTT host, room name,
+//     calibration constants, device fingerprint, …).
+//   * Portal UX shaping (setUiDefaultTab / setUiHideWifiTab) so an AP-only
+//     setup appliance can open straight on its parameter form.
 //   * Static-IP, hostname, mDNS, country-code and hidden-SSID configuration.
 //   * /wifi/status JSON for in-place diagnostics: signal, BSSID, AP MAC,
 //     gateway, DNS, uptime, last disconnect reason.
@@ -56,7 +59,13 @@ enum class NetState : uint8_t {
 };
 
 enum class NetParamType : uint8_t {
-  Text=0, Password, Number, Toggle, Dropdown, Color, Header, Divider, Textarea
+  Text=0, Password, Number, Toggle, Dropdown, Color, Header, Divider, Textarea,
+  // Read-only value field. Renders the firmware-supplied `value` in a
+  // monospace box with a copy-to-clipboard button — for things the operator
+  // must read/copy but never edit (device fingerprint, serial, build id).
+  // Its content is firmware-owned: never persisted to NVS, never round-
+  // tripped on save (see isInputParam in the .cpp).
+  Display
 };
 
 struct NetParam {
@@ -93,6 +102,20 @@ public:
   void setBrandColor(const String &css)    { _brandColor = css; }
   void setTitle(const String &t)           { _title = t; }
   void setAutoReconnect(bool on)           { _autoReconnect = on; }
+
+  // Portal UX shaping — which tab opens first, and whether the Wi-Fi
+  // scan/join tab is shown at all. For an AP-only "setup appliance" that
+  // never joins a station network (e.g. a device whose only network role
+  // is to host this config portal), open straight on the parameter form
+  // and hide the Wi-Fi tab so the operator isn't faced with an irrelevant
+  // network picker. Default keeps the classic provisioning UX.
+  void setUiDefaultTab(const String &tab)  { _uiDefaultTab = tab; }   // "wifi" | "params" | "status"
+  void setUiHideWifiTab(bool hide)         { _uiHideWifi = hide; }
+
+  // HTTP Basic auth for the MUTATING portal endpoints (/wifi/connect,
+  // /wifi/params, /wifi/reset, /wifi/restart). Read-only status/portal render
+  // stay open. Empty user disables the gate (back-compat). Call before begin().
+  void setAuth(const String &user, const String &pass) { _authUser = user; _authPass = pass; }
 
   // Save/clear saved networks. saveCredentials() appends; the next call to
   // _connectBest() will try the strongest one first.
@@ -139,6 +162,7 @@ private:
   bool _tryConnect(const String &ssid, const String &pass, bool hidden);
   void _startSoftAp();
   void _mountHandlers();
+  bool _authGate(AsyncWebServerRequest *req);   // true if allowed (or auth off)
   String _renderPortal() const;
   String _statusJson() const;
 
@@ -154,6 +178,8 @@ private:
   String   _brandColor = "#3da9fc";
   String   _title      = "JouleNet · Setup";
   bool     _autoReconnect = true;
+  String   _uiDefaultTab = "wifi";   // tab the SPA opens on (see setUiDefaultTab)
+  bool     _uiHideWifi   = false;    // hide the Wi-Fi scan/join tab entirely
 
   uint32_t _portalTimeoutMs  = 180000;
   uint32_t _connectTimeoutMs = 15000;
@@ -163,6 +189,9 @@ private:
 
   bool     _staticOn = false;
   IPAddress _ip, _gw, _mask, _dnsIp;
+
+  String   _authUser;   // empty = mutating endpoints unauthenticated (back-compat)
+  String   _authPass;
 
   std::vector<NetCreds> _saved;
   std::vector<NetParam> _params;

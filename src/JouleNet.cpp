@@ -28,6 +28,9 @@
 #include "JouleNet_ui.h"
 #include "JouleNet_ui_gz.h"
 #include <ArduinoJson.h>
+#if defined(ESP32)
+#include <esp_wifi.h>   // esp_wifi_set_country / wifi_country_t (country code)
+#endif
 
 // Serve pre-compressed UI with Content-Encoding: gzip. ~11 KB → ~3.7 KB
 // on the wire, reliable on weak Wi-Fi links where the uncompressed
@@ -45,6 +48,18 @@ namespace joule {
 static Preferences gNvs;
 static const char *NS = "joulenet";
 #endif
+
+// Header / Divider / Display are presentation-only. Their content is owned
+// by the firmware and recomputed on every boot (a section title, a rule, or
+// a read-only value such as a device fingerprint). They must NOT be restored
+// from / persisted to NVS, nor written back on a /wifi/params POST — doing so
+// would let a stale persisted blank clobber a freshly-computed value. Only
+// editable input types round-trip through storage and save.
+static bool isInputParam(NetParamType t) {
+  return t != NetParamType::Header &&
+         t != NetParamType::Divider &&
+         t != NetParamType::Display;
+}
 
 JouleNetClass::JouleNetClass() {}
 
@@ -104,6 +119,7 @@ void JouleNetClass::_loadFromNvs() {
     }
   }
   for (auto &p : _params) {
+    if (!isInputParam(p.type)) continue;   // firmware-owned, not stored
     String key = String("p_") + p.key;
     if (gNvs.isKey(key.c_str())) p.value = gNvs.getString(key.c_str(), p.value);
   }
@@ -132,6 +148,7 @@ void JouleNetClass::_saveToNvs() {
     gNvs.putUInt("dn", (uint32_t)_dnsIp);
   }
   for (auto &p : _params) {
+    if (!isInputParam(p.type)) continue;   // firmware-owned, not stored
     String key = String("p_") + p.key;
     gNvs.putString(key.c_str(), p.value);
   }
@@ -162,7 +179,20 @@ String JouleNetClass::_statusJson() const {
   d["mac"]      = WiFi.macAddress();
   d["heap"]     = ESP.getFreeHeap();
   d["uptime_s"] = millis()/1000;
+  // Portal UX hints — the SPA reads these on first load to pick its opening
+  // tab and to hide the Wi-Fi picker on AP-only setup appliances.
+  d["uiDefaultTab"] = _uiDefaultTab;
+  d["uiHideWifi"]   = _uiHideWifi;
   String s; serializeJson(d, s); return s;
+}
+
+bool JouleNetClass::_authGate(AsyncWebServerRequest *req) {
+  if (_authUser.length() == 0) return true;            // auth disabled (back-compat)
+  if (!req->authenticate(_authUser.c_str(), _authPass.c_str())) {
+    req->requestAuthentication();                      // 401 + WWW-Authenticate
+    return false;
+  }
+  return true;
 }
 
 void JouleNetClass::_mountHandlers() {
@@ -214,6 +244,7 @@ void JouleNetClass::_mountHandlers() {
       if (index == 0) buf = "";
       buf.concat((const char*)data, len);
       if (index + len == total) {
+        if (!_authGate(req)) return;                   // admin-only
         JsonDocument d;
         if (deserializeJson(d, buf) != DeserializationError::Ok) {
           req->send(400, "text/plain", "bad json"); return;
@@ -256,6 +287,7 @@ void JouleNetClass::_mountHandlers() {
                    p.type==NetParamType::Dropdown?"dropdown":
                    p.type==NetParamType::Color?"color":
                    p.type==NetParamType::Textarea?"textarea":
+                   p.type==NetParamType::Display?"display":
                    p.type==NetParamType::Header?"header":
                    p.type==NetParamType::Divider?"divider":"text");
       o["value"]=p.value; o["hint"]=p.hint; o["opts"]=p.opts;
@@ -272,13 +304,21 @@ void JouleNetClass::_mountHandlers() {
       if (index == 0) buf = "";
       buf.concat((const char*)data, len);
       if (index + len == total) {
+        if (!_authGate(req)) return;                   // admin-only
         JsonDocument d;
         if (deserializeJson(d, buf) != DeserializationError::Ok) {
           req->send(400,"text/plain","bad json"); return;
         }
         for (auto &p : _params) {
-          if (d[p.key].is<const char*>()) p.value = String((const char*)d[p.key]);
-          else if (!d[p.key].isNull()) p.value = String((const char*)d[p.key]);
+          if (!isInputParam(p.type)) continue;        // presentation-only, never written
+          // as<String>() stringifies whatever JSON type arrived: a quoted
+          // string passes through verbatim, a JSON number ("number" inputs
+          // bind to JS numbers, not strings) becomes its decimal text, a
+          // bool becomes "true"/"false". The previous (const char*) cast
+          // returned nullptr for any non-string variant, so editing a
+          // Number field silently saved an empty value and it reverted to
+          // default on reload.
+          if (!d[p.key].isNull()) p.value = d[p.key].as<String>();
         }
         _saveToNvs();
         if (_onConfig) _onConfig(_params);
@@ -287,8 +327,8 @@ void JouleNetClass::_mountHandlers() {
     });
 
   _server->on("/wifi/status",   HTTP_GET,  [this](AsyncWebServerRequest *req){ req->send(200,"application/json",_statusJson()); });
-  _server->on("/wifi/reset",    HTTP_POST, [this](AsyncWebServerRequest *req){ req->send(200,"text/plain","ok"); delay(150); resetAndReboot(); });
-  _server->on("/wifi/restart",  HTTP_POST, [    ](AsyncWebServerRequest *req){ req->send(200,"text/plain","ok"); delay(150); ESP.restart(); });
+  _server->on("/wifi/reset",    HTTP_POST, [this](AsyncWebServerRequest *req){ if(!_authGate(req)) return; req->send(200,"text/plain","ok"); delay(150); resetAndReboot(); });
+  _server->on("/wifi/restart",  HTTP_POST, [this](AsyncWebServerRequest *req){ if(!_authGate(req)) return; req->send(200,"text/plain","ok"); delay(150); ESP.restart(); });
 }
 
 void JouleNetClass::begin(AsyncWebServer *server) {
@@ -300,6 +340,21 @@ void JouleNetClass::begin(AsyncWebServer *server) {
   // glue before any other Wi-Fi method.
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(_hostname.c_str());
+  // Apply the regulatory country. setCountryCode() used to be a dead setter
+  // (the radio stayed on the default "01" worldwide map, restricting channels
+  // and TX power); push it into esp_wifi here so e.g. "IN" enables ch 1-13.
+#if defined(ESP32)
+  if (_countryCode.length() >= 2) {
+    wifi_country_t ctry = {};
+    ctry.cc[0] = _countryCode[0];
+    ctry.cc[1] = _countryCode[1];
+    ctry.cc[2] = '\0';
+    ctry.schan = 1;
+    ctry.nchan = (_countryCode == "01" || _countryCode == "US") ? 11 : 13;
+    ctry.policy = WIFI_COUNTRY_POLICY_MANUAL;
+    esp_wifi_set_country(&ctry);
+  }
+#endif
   _mountHandlers();
 }
 
