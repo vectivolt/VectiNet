@@ -5,10 +5,13 @@
 // (c) 2026 — MIT License
 // ---------------------------------------------------------------------------
 //
-// MultiSSID — save several networks; JouleNet tries them in saved order
-// on every boot and switches automatically if the active one drops.
-// Great for devices that get carried between home, office, lab, and the
-// guest network at a customer site.
+// MultiSSID — save several networks; JouleNet tries them in saved order on
+// every boot, one at a time, until one associates. Great for devices that
+// get carried between home, office, lab, and the guest network at a
+// customer site. Note the order is the saved order, not signal strength:
+// put the network you expect most often first. If the active link drops the
+// radio retries that same AP; the reprovision watchdog below is what
+// eventually raises the portal.
 
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>

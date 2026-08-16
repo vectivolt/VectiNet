@@ -44,10 +44,18 @@ void setup() {
     // re-init your downstream clients here
   });
 
+  // autoConnect() returns before the radio has associated, so there is no
+  // IP to print here — wait for the state change.
+  JouleNet.onState([](joule::NetState s){
+    if (s == joule::NetState::Connected)
+      Serial.println("portal at http://" + WiFi.localIP().toString() + "/wifi");
+    else if (s == joule::NetState::Portal)
+      Serial.println("portal at http://" + WiFi.softAPIP().toString() + "/wifi");
+  });
+
   JouleNet.begin(&server);
   server.begin();
   JouleNet.autoConnect();
-  Serial.println("portal at http://" + WiFi.localIP().toString() + "/wifi");
 }
 
 void loop() {
