@@ -1,13 +1,13 @@
-# JouleNet
+# VectiNet
 
 > Wi-Fi provisioning + network manager for ESP32. Captive portal,
 > **multi-SSID failover**, 10 custom-parameter types, static IP, mDNS,
 > country code, NVS-backed persistence, live diagnostics.
-> MIT-licensed, mobile-first, **~28 KB on the wire**.
+> Apache-2.0 licensed, mobile-first, **~28 KB on the wire**.
 
-![JouleNet portal](docs/screenshots/wifi-desktop.png)
+![VectiNet portal](docs/screenshots/wifi-desktop.png)
 
-**Author:** [Chinmoy Bhuyan](mailto:dikibhuyan@gmail.com) · **License:** MIT
+**Author:** [Chinmoy Bhuyan](mailto:chinmoy@joulepoint.com) · **License:** Apache-2.0
 · **Targets:** ESP32 (S2 / S3 / C3 / classic)
 
 > **ESP32 only.** Persistence (Preferences/NVS), mDNS and the regulatory
@@ -43,27 +43,27 @@
 ```cpp
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
-#include <JouleNet.h>
+#include <VectiNet.h>
 
 AsyncWebServer server(80);
 
 void setup() {
-  JouleNet.setApCredentials("MyDevice-Setup");
-  JouleNet.setHostname("mydevice");
-  JouleNet.setMdnsName("mydevice");
+  VectiNet.setApCredentials("MyDevice-Setup");
+  VectiNet.setHostname("mydevice");
+  VectiNet.setMdnsName("mydevice");
 
-  JouleNet.addParameter({"mqtt_host", "MQTT host", joule::NetParamType::Text,
+  VectiNet.addParameter({"mqtt_host", "MQTT host", vecti::NetParamType::Text,
                          "broker.local", "fqdn or ip", "", 0, 0});
-  JouleNet.addParameter({"mqtt_port", "MQTT port", joule::NetParamType::Number,
+  VectiNet.addParameter({"mqtt_port", "MQTT port", vecti::NetParamType::Number,
                          "1883", "", "", 1, 65535});
 
-  JouleNet.begin(&server);
+  VectiNet.begin(&server);
   server.begin();
-  JouleNet.autoConnect();
+  VectiNet.autoConnect();
 }
 
 void loop() {
-  JouleNet.loop();   // pumps DNS, portal watchdog, reconnect
+  VectiNet.loop();   // pumps DNS, portal watchdog, reconnect
 }
 ```
 
@@ -102,8 +102,8 @@ PLC front panel — opens straight on its parameter form and drops the network
 picker entirely:
 
 ```cpp
-JouleNet.setUiDefaultTab("params");
-JouleNet.setUiHideWifiTab(true);
+VectiNet.setUiDefaultTab("params");
+VectiNet.setUiHideWifiTab(true);
 ```
 
 Both are read by the SPA from `/wifi/status` on first load, so they take
@@ -119,7 +119,7 @@ next reboot. Leave them unset to let the portal own them.
 ### Authentication
 
 ```cpp
-JouleNet.setAuth("admin", "s3cret");   // before begin()
+VectiNet.setAuth("admin", "s3cret");   // before begin()
 ```
 
 **Everything under `/wifi` is unauthenticated until you call this** — the
@@ -204,7 +204,7 @@ String paramValue(const String &key) const;
 ```
 
 Parameters render on the **Setup** tab of the portal. Values persist to
-NVS (`Preferences` namespace `joulenet`, key `p_<param-key>`). Add them
+NVS (`Preferences` namespace `vectinet`, key `p_<param-key>`). Add them
 **before** `begin()`.
 
 `Header`, `Divider` and `Display` are presentation-only: their content is
@@ -216,17 +216,17 @@ read but never edit.
 Example covering every type:
 
 ```cpp
-JouleNet.addParameter({"sec1",   "Application", joule::NetParamType::Header,  "","","",0,0});
-JouleNet.addParameter({"room",   "Room name",   joule::NetParamType::Text,    "Lab","where is this device?","",0,0});
-JouleNet.addParameter({"mqtt_h", "MQTT host",   joule::NetParamType::Text,    "broker.local","fqdn or ip","",0,0});
-JouleNet.addParameter({"mqtt_p", "MQTT port",   joule::NetParamType::Number,  "1883","","",1,65535});
-JouleNet.addParameter({"mqtt_pw","MQTT password",joule::NetParamType::Password,"","","",0,0});
-JouleNet.addParameter({"region", "Region",      joule::NetParamType::Dropdown,"EU","","EU|US|APAC|other",0,0});
-JouleNet.addParameter({"colour", "Accent",      joule::NetParamType::Color,   "#7c5cff","","",0,0});
-JouleNet.addParameter({"verbose","Verbose logs",joule::NetParamType::Toggle,  "1","","",0,0});
-JouleNet.addParameter({"sec2",   "Notes",       joule::NetParamType::Divider, "","","",0,0});
-JouleNet.addParameter({"notes",  "Site notes",  joule::NetParamType::Textarea,"line 1\nline 2","free-form","",0,0});
-JouleNet.addParameter({"fp",     "Device ID",   joule::NetParamType::Display, deviceFingerprint(),"","",0,0});
+VectiNet.addParameter({"sec1",   "Application", vecti::NetParamType::Header,  "","","",0,0});
+VectiNet.addParameter({"room",   "Room name",   vecti::NetParamType::Text,    "Lab","where is this device?","",0,0});
+VectiNet.addParameter({"mqtt_h", "MQTT host",   vecti::NetParamType::Text,    "broker.local","fqdn or ip","",0,0});
+VectiNet.addParameter({"mqtt_p", "MQTT port",   vecti::NetParamType::Number,  "1883","","",1,65535});
+VectiNet.addParameter({"mqtt_pw","MQTT password",vecti::NetParamType::Password,"","","",0,0});
+VectiNet.addParameter({"region", "Region",      vecti::NetParamType::Dropdown,"EU","","EU|US|APAC|other",0,0});
+VectiNet.addParameter({"colour", "Accent",      vecti::NetParamType::Color,   "#7c5cff","","",0,0});
+VectiNet.addParameter({"verbose","Verbose logs",vecti::NetParamType::Toggle,  "1","","",0,0});
+VectiNet.addParameter({"sec2",   "Notes",       vecti::NetParamType::Divider, "","","",0,0});
+VectiNet.addParameter({"notes",  "Site notes",  vecti::NetParamType::Textarea,"line 1\nline 2","free-form","",0,0});
+VectiNet.addParameter({"fp",     "Device ID",   vecti::NetParamType::Display, deviceFingerprint(),"","",0,0});
 ```
 
 ### Lifecycle
@@ -298,7 +298,7 @@ are open when it is not.
 | `/generate_204`, `/gen_204`, `/hotspot-detect.html`, `/ncsi.txt` | GET | OS captive-portal probes (all serve the portal page) |
 
 `/` is deliberately **not** mounted — it belongs to whichever library the
-sketch chose as its primary UI (JouleDash, typically). Browse to `/wifi`.
+sketch chose as its primary UI (VectiDash, typically). Browse to `/wifi`.
 
 On `/wifi/connect`: `staticIp` + `gateway` + `netmask` must arrive together
 and must all parse, or the whole request is rejected with `400 bad ip` —
@@ -313,7 +313,7 @@ arriving before `loop()` has applied the first with `409`.
 
 ```json
 {
-  "title":    "JouleNet · Setup",
+  "title":    "VectiNet · Setup",
   "brand":    "#3da9fc",
   "state":    2,
   "ssid":     "MyNetwork",
@@ -324,8 +324,8 @@ arriving before `loop()` has applied the first with `409`.
   "bssid":    "28:EE:52:EA:23:FC",
   "channel":  10,
   "rssi":     -86,
-  "hostname": "joule-demo",
-  "mdns":     "joule-demo.local",
+  "hostname": "vecti-demo",
+  "mdns":     "vecti-demo.local",
   "mac":      "D0:CF:13:73:0A:B8",
   "heap":     258188,
   "uptime_s": 124,
@@ -363,13 +363,13 @@ The portal has three tabs:
 
 Mobile (390 px wide):
 
-![JouleNet mobile](docs/screenshots/wifi-mobile.png)
+![VectiNet mobile](docs/screenshots/wifi-mobile.png)
 
 ---
 
 ## NVS schema
 
-Namespace: `joulenet` (Preferences API).
+Namespace: `vectinet` (Preferences API).
 
 | Key      | Type    | Purpose |
 |---|---|---|
@@ -399,9 +399,9 @@ from different networks.
 ### Read a saved parameter
 
 ```cpp
-String mqttHost = JouleNet.paramValue("mqtt_host");
-int    port     = JouleNet.paramValue("mqtt_port").toInt();
-bool   verbose  = JouleNet.paramValue("verbose") == "1";
+String mqttHost = VectiNet.paramValue("mqtt_host");
+int    port     = VectiNet.paramValue("mqtt_port").toInt();
+bool   verbose  = VectiNet.paramValue("verbose") == "1";
 ```
 
 ### Reach the portal even while connected
@@ -417,10 +417,10 @@ open http://device.local/wifi
 ### React to state changes
 
 ```cpp
-JouleNet.onState([](joule::NetState s){
-  if (s == joule::NetState::Connected) {
+VectiNet.onState([](vecti::NetState s){
+  if (s == vecti::NetState::Connected) {
     setupMqtt();
-  } else if (s == joule::NetState::Portal) {
+  } else if (s == vecti::NetState::Portal) {
     showSetupHintOnDisplay();
   }
 });
@@ -429,7 +429,7 @@ JouleNet.onState([](joule::NetState s){
 ### React to parameter changes
 
 ```cpp
-JouleNet.onConfig([](const std::vector<joule::NetParam>& params){
+VectiNet.onConfig([](const std::vector<vecti::NetParam>& params){
   // user saved the Setup tab — re-read what matters
   reconfigureMqtt();
 });
@@ -438,7 +438,7 @@ JouleNet.onConfig([](const std::vector<joule::NetParam>& params){
 ### Static IP from code
 
 ```cpp
-JouleNet.setStaticIP(
+VectiNet.setStaticIP(
   IPAddress(192,168,1,200),
   IPAddress(192,168,1,1),
   IPAddress(255,255,255,0),
@@ -448,11 +448,11 @@ JouleNet.setStaticIP(
 ### Block until connected (legacy-style)
 
 ```cpp
-if (!JouleNet.blockingConnect(15000)) {
+if (!VectiNet.blockingConnect(15000)) {
   // 15 s is the whole budget: the sweep may still be working through the
   // saved list in loop(). Force the portal only if you'd rather stop here.
   Serial.println("Wi-Fi not up yet — opening portal");
-  JouleNet.startPortal();
+  VectiNet.startPortal();
 }
 ```
 
@@ -460,7 +460,7 @@ if (!JouleNet.blockingConnect(15000)) {
 
 ## Captive-portal mechanics
 
-When the portal is up, JouleNet runs a UDP **DNS server on port 53** that
+When the portal is up, VectiNet runs a UDP **DNS server on port 53** that
 answers every query with the SoftAP's IP. Modern OSes then issue a known
 "connectivity probe" URL:
 
@@ -470,7 +470,7 @@ answers every query with the SoftAP's IP. Modern OSes then issue a known
 | iOS/macOS| `http://captive.apple.com/hotspot-detect.html` |
 | Windows  | `http://www.msftncsi.com/ncsi.txt` |
 
-JouleNet's handlers for these exact paths serve the portal HTML, so the
+VectiNet's handlers for these exact paths serve the portal HTML, so the
 OS pops the setup screen automatically — no manual "192.168.4.1" needed.
 
 ---
@@ -479,12 +479,12 @@ OS pops the setup screen automatically — no manual "192.168.4.1" needed.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `tcpip_api_call ... Invalid mbox` panic on boot | `WiFi.setHostname()` called before lwIP init | The library calls `WiFi.mode(WIFI_STA)` first — make sure you don't call `WiFi.setHostname()` yourself before `JouleNet.begin()` |
+| `tcpip_api_call ... Invalid mbox` panic on boot | `WiFi.setHostname()` called before lwIP init | The library calls `WiFi.mode(WIFI_STA)` first — make sure you don't call `WiFi.setHostname()` yourself before `VectiNet.begin()` |
 | Phone connects to AP but no portal pops | Captive-portal probe blocked by firewall or VPN | Manually browse to `http://192.168.4.1/wifi` |
 | Connect button times out | Wrong password or out-of-range network | Watch the Status tab; it shows the live state |
 | Saved network never reconnects after router reboot | `setAutoReconnect(false)` set | Re-enable, or call `WiFi.reconnect()` in `loop()` |
 | Custom params don't show | `addParameter()` called after `begin()` | Move the calls **before** `begin()` |
-| Status tab stays on "connecting" forever | `loop()` isn't running — the connect sweep is driven from there | Call `JouleNet.loop()` every pass; don't block in `setup()` |
+| Status tab stays on "connecting" forever | `loop()` isn't running — the connect sweep is driven from there | Call `VectiNet.loop()` every pass; don't block in `setup()` |
 | Portal hostname / country reverts after reboot | The sketch calls `setHostname()` / `setCountryCode()`, which win over NVS | Drop the setter and let the portal own the field |
 | Network list empty on the first look | The scan is asynchronous; results land a few seconds in | The portal retries by itself, or tap refresh (rescans at most every 10 s) |
 
@@ -500,19 +500,19 @@ OS pops the setup screen automatically — no manual "192.168.4.1" needed.
 
 `AsyncURIMatcher::exact()` comes from ESPAsyncWebServer, not the core, and
 `_mountHandlers()` depends on it — without it `/wifi` swallows `/wifi/*` and
-JouleDash's routes on `/` never get a look-in. **3.11.0 is the only release
+VectiDash's routes on `/` never get a look-in. **3.11.0 is the only release
 verified here**, so that is the declared floor. Earlier 3.x releases may well
 carry the matcher; building against one is untested, and the symptom if it
 doesn't is `error: 'AsyncURIMatcher' has not been declared` on five lines of
-`JouleNet.cpp` with nothing pointing at the version. Lower the floor yourself
+`VectiNet.cpp` with nothing pointing at the version. Lower the floor yourself
 if you have confirmed a specific older release.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE).
 
 ---
 
-<sub>**Author:** Chinmoy Bhuyan · **Email:** dikibhuyan@gmail.com · **(c)** 2026 — MIT</sub>
+<sub>**Author:** Chinmoy Bhuyan · **Email:** chinmoy@joulepoint.com · **(c)** 2026 — Apache-2.0</sub>

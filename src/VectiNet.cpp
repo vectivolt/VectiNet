@@ -1,13 +1,13 @@
 // ---------------------------------------------------------------------------
-// JouleSuite for ESP32 / ESP8266 — JouleOTA · JouleSerial · JouleNet · JouleDash
+// VectiSuite for ESP32 / ESP8266 — VectiOTA · VectiSerial · VectiNet · VectiDash
 // Author: Chinmoy Bhuyan
-// Email:  dikibhuyan@gmail.com
-// (c) 2026 — MIT License
+// Email:  chinmoy@joulepoint.com
+// (c) 2026 VectiVolt — Apache-2.0 License
 // ---------------------------------------------------------------------------
 
-// JouleNet implementation. Highlights:
+// VectiNet implementation. Highlights:
 //
-//   * NVS layout: namespace "joulenet". Keys:
+//   * NVS layout: namespace "vectinet". Keys:
 //        n         (uint8)   - number of saved SSIDs
 //        s0..sN    (string)  - SSID
 //        p0..pN    (string)  - password
@@ -36,8 +36,8 @@
 //     returns; loop() does the flash write and fires the callback. The one
 //     thing a handler mutates directly is p.value, under paramMx().
 
-#include "JouleNet.h"
-#include "JouleNet_ui_gz.h"
+#include "VectiNet.h"
+#include "VectiNet_ui_gz.h"
 #include <ArduinoJson.h>
 #include <esp_wifi.h>   // esp_wifi_set_country / wifi_country_t (country code)
 
@@ -99,10 +99,10 @@ static char *collectBody(AsyncWebServerRequest *req, const uint8_t *data,
   return b->data;
 }
 
-namespace joule {
+namespace vecti {
 
 static Preferences gNvs;
-static const char *NS = "joulenet";
+static const char *NS = "vectinet";
 static const size_t kMaxNetworks = 8;   // NVS slots s0..s7 / p0..p7 / h0..h7
 
 // Header / Divider / Display are presentation-only. Their content is owned
@@ -149,24 +149,24 @@ struct ParamLock {
   ~ParamLock() { xSemaphoreGive(paramMx()); }
 };
 
-JouleNetClass::JouleNetClass() {}
+VectiNetClass::VectiNetClass() {}
 
-void JouleNetClass::setApCredentials(const String &ssid, const String &password) {
+void VectiNetClass::setApCredentials(const String &ssid, const String &password) {
   _apSsid = ssid; _apPass = password;
 }
 
-void JouleNetClass::setStaticIP(IPAddress ip, IPAddress gw, IPAddress mask, IPAddress dns) {
+void VectiNetClass::setStaticIP(IPAddress ip, IPAddress gw, IPAddress mask, IPAddress dns) {
   _staticOn = true; _ip = ip; _gw = gw; _mask = mask; _dnsIp = dns;
   _staticFromCode = true;
 }
-void JouleNetClass::clearStaticIP() { _staticOn = false; _staticFromCode = true; }
+void VectiNetClass::clearStaticIP() { _staticOn = false; _staticFromCode = true; }
 
-void JouleNetClass::addParameter(const NetParam &p) {
+void VectiNetClass::addParameter(const NetParam &p) {
   for (auto &x : _params) if (x.key == p.key) { x = p; return; }
   _params.push_back(p);
 }
 
-bool JouleNetClass::saveCredentials(const String &ssid, const String &password, bool hidden) {
+bool VectiNetClass::saveCredentials(const String &ssid, const String &password, bool hidden) {
   // Merge NVS in FIRST. _saveToNvs() would otherwise do it at the end, after
   // the capacity check below had already passed against a pre-begin() _saved
   // that only looks empty: the merge then pushes the total past kMaxNetworks,
@@ -184,7 +184,7 @@ bool JouleNetClass::saveCredentials(const String &ssid, const String &password, 
   return true;
 }
 
-void JouleNetClass::clearAllCredentials() {
+void VectiNetClass::clearAllCredentials() {
   // Load BEFORE clearing. _saveToNvs() reloads whenever !_nvsLoaded, so a
   // pre-begin() call (factory-reset jumper read in setup(), typically) would
   // re-populate _saved from the very slots being erased and write every one of
@@ -195,7 +195,7 @@ void JouleNetClass::clearAllCredentials() {
   _saved.clear(); _saveToNvs();
 }
 
-void JouleNetClass::_loadFromNvs() {
+void VectiNetClass::_loadFromNvs() {
   gNvs.begin(NS, true);
   uint8_t n = gNvs.getUChar("n", 0);
   for (uint8_t i = 0; i < n && i < kMaxNetworks; i++) {
@@ -239,7 +239,7 @@ void JouleNetClass::_loadFromNvs() {
   _nvsLoaded = true;
 }
 
-void JouleNetClass::_saveToNvs() {
+void VectiNetClass::_saveToNvs() {
   // A sketch may saveCredentials() before begin() — MultiSSID.ino seeds five
   // networks that way, and the quick start calls addParameter() before it.
   // Writing here without reading first would put the code defaults over every
@@ -280,7 +280,7 @@ void JouleNetClass::_saveToNvs() {
 
 // ---------- portal handlers -------------------------------------------------
 
-String JouleNetClass::_statusJson() const {
+String VectiNetClass::_statusJson() const {
   JsonDocument d;
   // Runs on the AsyncTCP task. Snapshot the two Strings the Arduino task
   // reassigns before ArduinoJson copies characters out of their heap buffers —
@@ -314,7 +314,7 @@ String JouleNetClass::_statusJson() const {
   String s; serializeJson(d, s); return s;
 }
 
-bool JouleNetClass::_authGate(AsyncWebServerRequest *req) {
+bool VectiNetClass::_authGate(AsyncWebServerRequest *req) {
   if (_authUser.length() == 0) return true;            // auth disabled (back-compat)
   if (!req->authenticate(_authUser.c_str(), _authPass.c_str())) {
     req->requestAuthentication();                      // 401 + WWW-Authenticate
@@ -323,18 +323,18 @@ bool JouleNetClass::_authGate(AsyncWebServerRequest *req) {
   return true;
 }
 
-void JouleNetClass::_mountHandlers() {
+void VectiNetClass::_mountHandlers() {
   // Captive-portal "is this the internet?" probes need a 200/204 from any
   // host. We serve the portal for /, and a small detect file for known
   // probe URLs (so the OS pops the page automatically).
   auto sendPortal = [this](AsyncWebServerRequest *req){
     if (!_authGate(req)) return;
-    sendGzippedUi(req, joule::NET_UI_HTML_GZ, joule::NET_UI_HTML_GZ_LEN);
+    sendGzippedUi(req, vecti::NET_UI_HTML_GZ, vecti::NET_UI_HTML_GZ_LEN);
   };
   // All portal-pop URLs must be EXACT match. The default
   // BackwardCompatible matcher would make `/wifi` swallow `/wifi/*`,
   // and `/` would swallow every request on the server. Routes registered
-  // with another library (JouleDash on `/`) won't even get a chance unless
+  // with another library (VectiDash on `/`) won't even get a chance unless
   // we constrain ourselves with exact().
   _server->on(AsyncURIMatcher::exact("/wifi"), HTTP_GET, sendPortal);
   _server->on(AsyncURIMatcher::exact("/generate_204"), HTTP_GET, sendPortal);   // Android
@@ -342,7 +342,7 @@ void JouleNetClass::_mountHandlers() {
   _server->on(AsyncURIMatcher::exact("/hotspot-detect.html"), HTTP_GET, sendPortal); // iOS/macOS
   _server->on(AsyncURIMatcher::exact("/ncsi.txt"),     HTTP_GET, sendPortal);   // Windows
   // NB: deliberately NOT mounting "/" — that belongs to whichever library
-  // the host sketch chose as its primary UI (typically JouleDash). Portal
+  // the host sketch chose as its primary UI (typically VectiDash). Portal
   // pop still works via the OS-specific probe URLs above.
 
   // Visible SSIDs and their BSSIDs describe the site, not just this device —
@@ -527,7 +527,7 @@ void JouleNetClass::_mountHandlers() {
 // portal changes it — setCountryCode() used to be a dead setter (the radio
 // stayed on the default "01" worldwide map, restricting channels and TX
 // power); e.g. "IN" enables ch 1-13.
-void JouleNetClass::_applyCountry() {
+void VectiNetClass::_applyCountry() {
   if (_countryCode.length() < 2) return;
   wifi_country_t ctry = {};
   ctry.cc[0] = _countryCode[0];
@@ -539,7 +539,7 @@ void JouleNetClass::_applyCountry() {
   esp_wifi_set_country(&ctry);
 }
 
-void JouleNetClass::begin(AsyncWebServer *server) {
+void VectiNetClass::begin(AsyncWebServer *server) {
   _server = server;
   _loadFromNvs();
   // IMPORTANT: WiFi.setHostname() touches lwIP, which crashes
@@ -552,7 +552,7 @@ void JouleNetClass::begin(AsyncWebServer *server) {
   _mountHandlers();
 }
 
-void JouleNetClass::_beginAttempt(const NetCreds &c) {
+void VectiNetClass::_beginAttempt(const NetCreds &c) {
   { ParamLock lk; _activeSsid = c.ssid; }   // read by /wifi/status, see paramMx()
   // Keep the SoftAP up while the portal is running: the phone that just
   // posted these credentials is still associated to it and polling
@@ -576,7 +576,7 @@ void JouleNetClass::_beginAttempt(const NetCreds &c) {
   WiFi.begin(c.ssid.c_str(), c.pass.c_str(), 0, NULL, true);
 }
 
-void JouleNetClass::_onLinkUp() {
+void VectiNetClass::_onLinkUp() {
   _sweeping = false;
   _attemptStartedAt = 0;
   _disconnectAt = 0;
@@ -585,7 +585,7 @@ void JouleNetClass::_onLinkUp() {
   _setState(NetState::Connected);
 }
 
-void JouleNetClass::_startSweep(size_t firstIdx) {
+void VectiNetClass::_startSweep(size_t firstIdx) {
   if (_saved.empty()) return;
   _sweepIdx = firstIdx < _saved.size() ? firstIdx : 0;
   _sweeping = true;
@@ -597,7 +597,7 @@ void JouleNetClass::_startSweep(size_t firstIdx) {
 // each given _connectTimeoutMs to associate. Blocking here instead (the old
 // delay(80) spin) stalls the sketch for N × timeout — two minutes with a
 // full saved list — and stalls it again every time the portal times out.
-void JouleNetClass::_pumpConnect() {
+void VectiNetClass::_pumpConnect() {
   if (!_sweeping) return;
   if (WiFi.status() == WL_CONNECTED) { _onLinkUp(); return; }
 
@@ -632,7 +632,7 @@ void JouleNetClass::_pumpConnect() {
 // rewritten under us; nothing past this point reads _pc* directly, because
 // saveCredentials() spends milliseconds inside a flash write and a String
 // reassigned by the other task mid-write would persist garbage.
-void JouleNetClass::_applyPendingConnect() {
+void VectiNetClass::_applyPendingConnect() {
   const String  ssid = _pcSsid, pass = _pcPass, host = _pcHost, cc = _pcCc;
   const bool    hidden = _pcHidden;
   const int8_t  stat   = _pcStatic;
@@ -668,12 +668,12 @@ void JouleNetClass::_applyPendingConnect() {
   _startSweep(idx);
 }
 
-void JouleNetClass::autoConnect() {
+void VectiNetClass::autoConnect() {
   if (_saved.empty()) { startPortal(); return; }
   _startSweep(0);
 }
 
-bool JouleNetClass::blockingConnect(uint32_t timeoutMs) {
+bool VectiNetClass::blockingConnect(uint32_t timeoutMs) {
   autoConnect();
   // timeoutMs is the whole budget. The sweep keeps running in the sketch's
   // own loop() afterwards, so a false here means "not yet", not "given up".
@@ -682,7 +682,7 @@ bool JouleNetClass::blockingConnect(uint32_t timeoutMs) {
   return _state == NetState::Connected;
 }
 
-void JouleNetClass::_startSoftAp() {
+void VectiNetClass::_startSoftAp() {
   WiFi.mode(WIFI_AP_STA);
   if (_apPass.length()) WiFi.softAP(_apSsid.c_str(), _apPass.c_str());
   else WiFi.softAP(_apSsid.c_str());
@@ -694,7 +694,7 @@ void JouleNetClass::_startSoftAp() {
   }
 }
 
-void JouleNetClass::startPortal() {
+void VectiNetClass::startPortal() {
   _startSoftAp();
   // Disarm the outage timer. Leaving it armed made the reprovision watchdog
   // fire again the instant the portal came down — stopPortal() and the portal
@@ -716,7 +716,7 @@ void JouleNetClass::startPortal() {
   }
 }
 
-void JouleNetClass::stopPortal() {
+void VectiNetClass::stopPortal() {
   _dns.stop(); _dnsRunning = false; _portalAuto = false;
   WiFi.softAPdisconnect(true);
   // Leave the state consistent: getState() reporting Portal after the portal
@@ -725,12 +725,12 @@ void JouleNetClass::stopPortal() {
     _setState(WiFi.status() == WL_CONNECTED ? NetState::Connected : NetState::Idle);
 }
 
-void JouleNetClass::resetAndReboot() {
+void VectiNetClass::resetAndReboot() {
   gNvs.begin(NS, false); gNvs.clear(); gNvs.end();
   delay(200); ESP.restart();
 }
 
-void JouleNetClass::loop() {
+void VectiNetClass::loop() {
   if (_dnsRunning) _dns.processNextRequest();
 
   if (_rebootAt && (int32_t)(millis() - _rebootAt) >= 0) {
@@ -793,21 +793,21 @@ void JouleNetClass::loop() {
   }
 }
 
-void JouleNetClass::_setState(NetState s) {
+void VectiNetClass::_setState(NetState s) {
   if (_state == s) return;
   _state = s;
   if (_onState) _onState(s);
 }
 
-IPAddress JouleNetClass::localIP()    const { return WiFi.localIP(); }
-IPAddress JouleNetClass::gatewayIP()  const { return WiFi.gatewayIP(); }
-IPAddress JouleNetClass::subnetMask() const { return WiFi.subnetMask(); }
-IPAddress JouleNetClass::apIP()       const { return WiFi.softAPIP(); }
-String    JouleNetClass::bssid()      const { return WiFi.BSSIDstr(); }
-int       JouleNetClass::rssi()       const { return WiFi.RSSI(); }
-uint8_t   JouleNetClass::channel()    const { return WiFi.channel(); }
-String    JouleNetClass::activeSsid() const { ParamLock lk; return _activeSsid; }
-String    JouleNetClass::paramValue(const String &key) const {
+IPAddress VectiNetClass::localIP()    const { return WiFi.localIP(); }
+IPAddress VectiNetClass::gatewayIP()  const { return WiFi.gatewayIP(); }
+IPAddress VectiNetClass::subnetMask() const { return WiFi.subnetMask(); }
+IPAddress VectiNetClass::apIP()       const { return WiFi.softAPIP(); }
+String    VectiNetClass::bssid()      const { return WiFi.BSSIDstr(); }
+int       VectiNetClass::rssi()       const { return WiFi.RSSI(); }
+uint8_t   VectiNetClass::channel()    const { return WiFi.channel(); }
+String    VectiNetClass::activeSsid() const { ParamLock lk; return _activeSsid; }
+String    VectiNetClass::paramValue(const String &key) const {
   // Called from the sketch's loop(); the /wifi/params POST reassigns p.value
   // on the AsyncTCP task. Copy under the lock — see paramMx().
   ParamLock lk;
@@ -815,6 +815,6 @@ String    JouleNetClass::paramValue(const String &key) const {
   return String();
 }
 
-} // namespace joule
+} // namespace vecti
 
-joule::JouleNetClass JouleNet;
+vecti::VectiNetClass VectiNet;

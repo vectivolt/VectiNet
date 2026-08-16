@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
-// JouleSuite for ESP32 / ESP8266 — JouleOTA · JouleSerial · JouleNet · JouleDash
+// VectiSuite for ESP32 / ESP8266 — VectiOTA · VectiSerial · VectiNet · VectiDash
 // Author: Chinmoy Bhuyan
-// Email:  dikibhuyan@gmail.com
-// (c) 2026 — MIT License
+// Email:  chinmoy@joulepoint.com
+// (c) 2026 VectiVolt — Apache-2.0 License
 // ---------------------------------------------------------------------------
 
-// JouleNet — Wi-Fi provisioning and network manager.
+// VectiNet — Wi-Fi provisioning and network manager.
 //
 // Why this exists: NetWizard.pro is closed-source, supports a single SSID,
-// and doesn't expose post-setup diagnostics. JouleNet adds:
+// and doesn't expose post-setup diagnostics. VectiNet adds:
 //
 //   * Multi-SSID list with automatic failover — up to 8 saved networks,
 //     tried in saved order until one associates. The sweep is driven from
@@ -44,7 +44,7 @@
 #include <vector>
 
 #if !defined(ESP32)
-  #error "JouleNet supports ESP32 only (needs Preferences/NVS, ESPmDNS and esp_wifi)."
+  #error "VectiNet supports ESP32 only (needs Preferences/NVS, ESPmDNS and esp_wifi)."
 #endif
 
 #include <WiFi.h>
@@ -52,7 +52,7 @@
 #include <ESPmDNS.h>
 #include <Preferences.h>
 
-namespace joule {
+namespace vecti {
 
 enum class NetState : uint8_t {
   Idle = 0,
@@ -91,9 +91,9 @@ struct NetCreds { String ssid; String pass; bool hidden=false; };
 using NetStateCb = std::function<void(NetState)>;
 using NetCfgCb   = std::function<void(const std::vector<NetParam>&)>;
 
-class JouleNetClass {
+class VectiNetClass {
 public:
-  JouleNetClass();
+  VectiNetClass();
 
   // Identify the AP shown to users when the portal is up. The AP password
   // is optional but recommended in public spaces. autoConnect() is async-
@@ -164,7 +164,7 @@ public:
 
   // Callbacks. Both fire on the Arduino task (from setup() or loop()), never
   // on the AsyncTCP task, even when an HTTP request caused the change —
-  // touching AsyncWebSocket or JouleSerial from the AsyncTCP task races
+  // touching AsyncWebSocket or VectiSerial from the AsyncTCP task races
   // whatever the sketch is doing with them. onConfig() therefore arrives on
   // the loop() tick after the operator hit Save, with a snapshot of the
   // parameter list rather than the live one.
@@ -211,13 +211,13 @@ private:
   DNSServer       _dns;
   bool            _dnsRunning = false;
 
-  String   _apSsid     = "Joule-Setup";
+  String   _apSsid     = "Vecti-Setup";
   String   _apPass;
-  String   _hostname   = "joule";
-  String   _mdnsName   = "joule";
+  String   _hostname   = "vecti";
+  String   _mdnsName   = "vecti";
   String   _countryCode= "01";
   String   _brandColor = "#3da9fc";
-  String   _title      = "JouleNet · Setup";
+  String   _title      = "VectiNet · Setup";
   bool     _autoReconnect = true;
   String   _uiDefaultTab = "wifi";   // tab the SPA opens on (see setUiDefaultTab)
   bool     _uiHideWifi   = false;    // hide the Wi-Fi scan/join tab entirely
@@ -277,6 +277,6 @@ private:
   NetCfgCb   _onConfig;
 };
 
-} // namespace joule
+} // namespace vecti
 
-extern joule::JouleNetClass JouleNet;
+extern vecti::VectiNetClass VectiNet;

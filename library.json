@@ -1,16 +1,16 @@
 {
-  "name": "JouleNet",
+  "name": "VectiNet",
   "version": "1.0.0",
   "description": "Wi-Fi provisioning + network manager for ESP32 \u2014 captive portal, multi-SSID with auto-failover, static IP, mDNS, custom parameters, signal diagnostics, NVS persistence.",
-  "keywords": "wifi, manager, captive, portal, esp32, joulenet, provisioning",
+  "keywords": "wifi, manager, captive, portal, esp32, vectinet, provisioning",
   "authors": [
     {
       "name": "Chinmoy Bhuyan",
-      "email": "dikibhuyan@gmail.com",
+      "email": "chinmoy@joulepoint.com",
       "maintainer": true
     }
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "frameworks": "arduino",
   "platforms": [
     "espressif32"
