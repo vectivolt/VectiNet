@@ -5,10 +5,10 @@
 > country code, NVS-backed persistence, live diagnostics.
 > Apache-2.0 licensed, mobile-first, **~28 KB on the wire**.
 
-![VectiNet portal](docs/screenshots/wifi-desktop.png)
+![VectiNet portal](docs/screenshots/net-dark.png)
 
 **Author:** [Chinmoy Bhuyan](mailto:chinmoy@joulepoint.com) · **License:** Apache-2.0
-· **Targets:** ESP32 (S2 / S3 / C3 / classic)
+· **ESP32 only** · **Built and run on:** ESP32-S3
 
 > **ESP32 only.** Persistence (Preferences/NVS), mDNS and the regulatory
 > country code sit on ESP-IDF APIs with no drop-in ESP8266 equivalent, so
@@ -34,11 +34,21 @@
 | ⚡ **Non-blocking connect** | `autoConnect()` returns immediately and `loop()` drives the attempts; `blockingConnect(timeout)` for setup() flows |
 | 🎨 **Theme aware** | Dark / light / auto; user choice persists |
 | 📱 **Mobile-first portal** | 44 px touch targets, viewport-fit safe-area, glass-morphism panels |
-| 🪶 **~28 KB on the wire** | Pre-gzipped UI — 28,498 B gzip, 82,969 B raw — served with `Content-Encoding: gzip` |
+| 🪶 **~28 KB on the wire** | Pre-gzipped UI — **28,498 B** gzip, 82,969 B raw — served with `Content-Encoding: gzip` |
 
 ---
 
 ## Quick start
+
+Three lines on top of an `AsyncWebServer` you already have:
+
+```cpp
+VectiNet.begin(&server);    // mounts /wifi + the OS captive-portal probes
+VectiNet.autoConnect();     // arms the sweep, returns immediately
+// …and VectiNet.loop(); from loop() — the sweep and the portal live there
+```
+
+The whole sketch:
 
 ```cpp
 #include <WiFi.h>
@@ -326,7 +336,7 @@ arriving before `loop()` has applied the first with `409`.
   "rssi":     -86,
   "hostname": "vecti-demo",
   "mdns":     "vecti-demo.local",
-  "mac":      "D0:CF:13:73:0A:B8",
+  "mac":      "D0:CF:13:72:17:58",
   "heap":     258188,
   "uptime_s": 124,
   "uiDefaultTab": "wifi",
@@ -361,9 +371,14 @@ The portal has three tabs:
 | **⚙ Setup** | Custom-parameter form auto-rendered from `/wifi/params` — every type from the table above |
 | **📊 Status** | Live diagnostics from `/wifi/status` (auto-refreshes every 3 s), Restart button, Erase-and-reboot button (red, confirmation) |
 
+Light theme (the ◐ toggle in the header; the choice persists in
+`localStorage["vecti-theme"]`):
+
+![VectiNet portal, light theme](docs/screenshots/net-light.png)
+
 Mobile (390 px wide):
 
-![VectiNet mobile](docs/screenshots/wifi-mobile.png)
+![VectiNet mobile](docs/screenshots/net-phone.png)
 
 ---
 
@@ -509,9 +524,36 @@ if you have confirmed a specific older release.
 
 ---
 
+## Limitations
+
+| Limitation | Detail |
+|---|---|
+| **8 saved networks, hard cap** | `saveCredentials()` returns `false` on the 9th. There is no eviction policy — you choose what to drop |
+| **No RSSI ranking** | `autoConnect()` tries the saved list **in saved order**, one at a time. It will join a weak known network ahead of a strong one further down the list. Put the network you expect first |
+| **NVS writes are not transactional** | `Preferences` has no journal and this library adds none. Ordering is the only guarantee: `n` is written after the slots it describes, so a power cut mid-save can cost the network you were adding, but never produces a slot whose SSID and password came from different networks |
+| **Unauthenticated by default** | Until you call `setAuth()`, every `/wifi` route is open — including `POST /wifi/reset` (factory reset) and `POST /wifi/connect` (re-point the device at another AP). Set credentials on anything that leaves your bench |
+| **Auth is plaintext** | HTTP Basic, in the clear. LAN-grade — put the device behind TLS or a VPN if the network is not trusted |
+| **Identity setters beat the portal** | `setHostname()` / `setMdnsName()` / `setCountryCode()` / `setStaticIP()` win over NVS on every boot, so the portal's matching field only survives until the next reboot. Leave them unset to let the portal own them |
+| **`hidden` changes nothing** | It is stored and round-tripped for the UI; esp_wifi probes for the configured SSID either way |
+| **Captive portal unverified end to end** | On the ESP32-S3 the device enters captive-portal state correctly with no stored credentials, and the four OS probe paths are registered. Actually joining a phone to the SoftAP and completing provisioning has **not** been verified — the board was checked over USB serial only |
+| **ESP32 only** | The header `#error`s elsewhere. Preferences/NVS, `ESPmDNS` and the regulatory country code have no drop-in ESP8266 equivalent, and a half-port would silently forget credentials on reboot rather than failing loudly |
+| **New project** | No CI, no test suite, no users yet, and not in the Arduino Library Manager. Install from Git or PlatformIO's `lib_deps` URL form |
+
+### License position — honest version
+
+VectiNet's own code is Apache-2.0. It links **ESPAsyncWebServer** and
+**AsyncTCP**, both **LGPL-3.0**. There is no dynamic linking on an MCU, so
+LGPL §4's relink obligations attach to the binary you ship. Do not read
+"Apache-2.0" as "no copyleft obligations" — plan for the LGPL terms on the
+async stack. Every ESP32 async-web library in this space inherits the same
+dependency, so this is a property of the ecosystem, not of this library.
+
+---
+
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE). See [Limitations](#limitations) for the
+LGPL-3.0 obligations inherited from ESPAsyncWebServer / AsyncTCP.
 
 ---
 
