@@ -7,7 +7,7 @@
 
 ![VectiNet portal](docs/screenshots/net-dark.png)
 
-**Author:** [Chinmoy Bhuyan](mailto:chinmoy@joulepoint.com) · **License:** Apache-2.0
+**Author:** [VectiVolt](mailto:team@vectivolt.com) · **License:** Apache-2.0
 · **ESP32 only** · **Built and run on:** ESP32-S3
 
 > **ESP32 only.** Persistence (Preferences/NVS), mDNS and the regulatory
@@ -557,4 +557,4 @@ LGPL-3.0 obligations inherited from ESPAsyncWebServer / AsyncTCP.
 
 ---
 
-<sub>**Author:** Chinmoy Bhuyan · **Email:** chinmoy@joulepoint.com · **(c)** 2026 — Apache-2.0</sub>
+<sub>**Author:** VectiVolt · **Email:** team@vectivolt.com · **(c)** 2026 — Apache-2.0</sub>
